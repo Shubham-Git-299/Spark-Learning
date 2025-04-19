@@ -1,3 +1,5 @@
+
+
 # Data Skewness and Salting in Apache Spark
 
 ## 🧠 What is Data Skewness?
@@ -93,3 +95,79 @@ To avoid the problems above, follow these **best practices** when salting to man
    val saltedRdd = rdd.map {
      case (key, value) => (key + "_" + scala.util.Random.nextInt(10), value)  // Salt range: 0 to 9
    }
+```
+
+
+---
+
+
+
+## **Splitting Skewed Data**
+- **Idea**: Identify skewed keys and handle them **separately** from the rest of the dataset.
+- **Why**: Allows you to apply custom logic or parallelism to just the problematic keys.
+- **How**:
+  ```scala
+  val skewed = rdd.filter(_._1 == "India")
+  val nonSkewed = rdd.filter(_._1 != "India")
+
+  val processedSkewed = skewed.reduceByKey(_ + _)
+  val processedNonSkewed = nonSkewed.reduceByKey(_ + _)
+
+  val finalResult = processedSkewed.union(processedNonSkewed)
+  ```
+## 💡 Other Techniques to Handle Skew
+
+### 1. **Splitting Skewed Data**
+- **Idea**: Identify skewed keys and handle them **separately** from the rest of the dataset.
+- **Why**: Allows you to apply custom logic or parallelism to just the problematic keys.
+- **How**:
+  ```scala
+  val skewed = rdd.filter(_._1 == "India")
+  val nonSkewed = rdd.filter(_._1 != "India")
+
+  val processedSkewed = skewed.reduceByKey(_ + _)
+  val processedNonSkewed = nonSkewed.reduceByKey(_ + _)
+
+  val finalResult = processedSkewed.union(processedNonSkewed)
+  ```
+### 2. Increase Partitions
+   - Idea: Repartition or coalesce your RDD/DataFrame to increase parallelism.
+   - Why: Distributes data more evenly across the cluster.
+   - Caution: More partitions can lead to higher scheduling overhead.
+```scala
+val repart = rdd.repartition(100)
+```
+
+### 3. Use reduceByKey
+   - Idea: Use transformations that aggregate data before shuffling.
+   - Why: Reduces amount of data transferred over the network.
+```scala
+rdd.reduceByKey(_ + _) // Preferred over groupByKey
+```
+
+### 4. Use Broadcast Join
+   - Idea: When joining a large dataset with a small one, broadcast the small one.
+   - Why: Avoids shuffling the large dataset.
+```scala
+val smallMap = Map("IN" -> "India", "US" -> "United States")
+val bcast = sc.broadcast(smallMap)
+
+val enriched = rdd.map {
+  case (code, value) => (bcast.value.getOrElse(code, "Unknown"), value)
+}
+```
+
+---
+
+## ✅ Summary
+
+| Technique              | Use Case                        | Benefit                         |
+|-----------------------|----------------------------------|----------------------------------|
+| Salting               | Highly skewed keys              | Distributes load evenly          |
+| Repartitioning        | General imbalance               | Better load distribution         |
+| reduceByKey           | Aggregations                    | Minimizes shuffle overhead       |
+| Splitting Skewed Data | Handle big keys separately      | Custom processing                |
+| Broadcast Join        | Small-large dataset joins       | Reduces shuffling                |
+
+📌 Always analyze key distribution before applying solutions!
+
