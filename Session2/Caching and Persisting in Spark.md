@@ -73,6 +73,61 @@ df.persist(StorageLevel.MEMORY_ONLY)
 
 ---
 
+## 💽 What Does "Disk" Mean in Spark?
+
+When Spark says it stores data on **disk**, it refers to:
+
+> 🗂️ The **local file system of the executor node**, not HDFS or S3.
+
+### 🔧 Storage Path
+- Spark writes to temporary directories like `/tmp` or paths under:
+  ```
+  spark.local.dir (e.g., /tmp or /data/spark-tmp)
+  ```
+- You can change this with:
+  ```bash
+  --conf spark.local.dir=/your/custom/path
+  ```
+
+### ⚠️ Important Notes:
+- ❌ Not HDFS, S3, or any external cloud storage
+- ✅ Temporary local disk used during job execution
+- 📦 Useful when memory is insufficient but recomputation is costly
+
+---
+
+## 🧠 What Does "Memory" Mean in Spark?
+
+When Spark refers to "memory", it means:
+
+> 🚀 The **RAM of the executor JVM process** running on each worker node.
+
+### 📦 Breakdown of Executor Memory
+```
+Total Executor Memory
+├── Reserved Memory (fixed ~300MB)
+├── User Memory (25%)
+├── Spark Memory (75%)
+     ├── Execution Memory (e.g., joins, shuffles)
+     └── Storage Memory (for caching/persisting)
+```
+Only the **Storage Memory portion** is used to store cached RDDs/DataFrames.
+
+### 🔍 Example
+If an executor has 8 GB:
+- ~300MB → Reserved
+- ~1.9 GB → User Memory
+- ~5.8 GB → Spark Memory (shared between execution and storage)
+
+> Cached data lives inside this 5.8 GB shared space under the storage region.
+
+### 🧯 If Memory Is Not Enough?
+- Spark may **evict older blocks** (LRU cache)
+- If using `MEMORY_ONLY`, it recomputes when accessed again
+- If using `MEMORY_AND_DISK`, it spills to disk
+
+---
+
 ## ✅ Best Practices
 - Use `cache()` when starting out or for prototyping
 - Use `persist()` with specific levels for tuning performance/memory
@@ -81,4 +136,3 @@ df.persist(StorageLevel.MEMORY_ONLY)
   ```scala
   df.unpersist()
   ```
-
